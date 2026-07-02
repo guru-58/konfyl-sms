@@ -9,10 +9,19 @@ export const helmetMiddleware = helmet();
 
 // 2. CORS Middleware Config
 const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
+const allowedOrigins = Array.isArray(process.env.CORS_ORIGIN)
+  ? process.env.CORS_ORIGIN
+  : String(process.env.CORS_ORIGIN || 'http://localhost:5173')
+      .split(',')
+      .map(origin => origin.trim())
+      .filter(Boolean);
+
 export const corsMiddleware = cors({
   origin: (origin, callback) => {
-    // Allow postman, curl, or same-origin requests in development
-    if (!origin || origin === allowedOrigin || origin.startsWith('http://localhost:') || process.env.NODE_ENV === 'development') {
+    const isLocalHost = origin && origin.startsWith('http://localhost:');
+    const isAllowed = !origin || allowedOrigins.includes(origin) || isLocalHost || process.env.NODE_ENV === 'development';
+
+    if (isAllowed) {
       callback(null, true);
     } else {
       logger.warn(`CORS blocked request from origin: ${origin}`);
@@ -20,8 +29,10 @@ export const corsMiddleware = cors({
     }
   },
   methods: ['POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With', 'X-CSRF-Token'],
+  credentials: true,
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 });
 
 // 3. Rate Limiter for Enquiry endpoint (max 5 requests per 15 minutes per IP)
