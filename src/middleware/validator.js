@@ -4,10 +4,7 @@ export const validateEnquiry = (req, res, next) => {
   const { fullName, phone, email, enquiryType, message, captchaToken } = req.body;
   const errors = {};
 
-  // 1. Verify Cloudflare Turnstile token presence
-  if (!captchaToken) {
-    errors.captcha = 'Verification challenge is required';
-  }
+  // CAPTCHA verification disabled
 
   // 2. Validate Full Name
   if (!fullName || typeof fullName !== 'string') {

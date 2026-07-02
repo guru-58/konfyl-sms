@@ -11,14 +11,7 @@ export const submitEnquiry = async (req, res) => {
   try {
     logger.info(`Received enquiry request from ${email}`);
 
-    // 1. Spam Prevention Verification
-    const isHuman = await verifyTurnstileToken(captchaToken, ipAddress);
-    if (!isHuman) {
-      logger.warn(`Spam Blocked: Captcha verification failed for IP: ${ipAddress}`);
-      return res.status(400).json({ 
-        error: 'Spam prevention check failed. Please refresh the page and try again.' 
-      });
-    }
+    // 1. Spam Prevention Verification (Disabled)
 
     // 2. Generate Unique Enquiry ID (e.g. KNF-20260702-00001)
     const enquiryId = await generateEnquiryId();
