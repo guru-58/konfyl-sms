@@ -1,0 +1,376 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String                  @id @default(uuid())
+  firebaseUid   String                  @unique
+  email         String                  @unique
+  name          String
+  roleId        String
+  role          Role                    @relation(fields: [roleId], references: [id])
+  isActive      Boolean                 @default(true)
+  doctorProfile Doctor?
+  mrProfile     MedicalRepresentative?  @relation("MRUser")
+  managedMRs    MedicalRepresentative[] @relation("MRManager")
+  blogs         Blog[]
+  quizResults   QuizResult[]
+  notifications Notification[]
+  aiChats       AIChat[]
+  certificates  Certificate[]
+  auditLogs     AuditLog[]
+  createdAt     DateTime                @default(now())
+  updatedAt     DateTime                @updatedAt
+}
+
+model Role {
+  id          String       @id // e.g. "SUPER_ADMIN", "ADMIN", "MANAGER", "MEDICAL_REPRESENTATIVE", "DOCTOR", "DISTRIBUTOR"
+  name        String       @unique
+  permissions Permission[]
+  users       User[]
+}
+
+model Permission {
+  id    String @id @default(uuid())
+  name  String @unique
+  roles Role[]
+}
+
+model Category {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model TherapeuticArea {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Product {
+  id                String               @id @default(uuid())
+  name              String               @unique
+  slug              String               @unique
+  brand             String
+  composition       String
+  categoryId        String
+  category          Category             @relation(fields: [categoryId], references: [id])
+  therapeuticAreaId String
+  therapeuticArea   TherapeuticArea      @relation(fields: [therapeuticAreaId], references: [id])
+  keywords          String[]
+  seoTitle          String?
+  seoDescription    String?
+  seoKeywords       String[]
+  viewCount         Int                  @default(0)
+  detailedInfo      ProductDetailedInfo?
+  competitors       CompetitorProduct[]
+  quizQuestions     QuizQuestion[]
+  trainingModules   TrainingModule[]
+  enquiries         Enquiry[]
+  course            Course?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+}
+
+model ProductDetailedInfo {
+  id                 String   @id @default(uuid())
+  productId          String   @unique
+  product            Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  mechanism          String
+  indications        String
+  contraindications  String
+  dosage             String
+  sideEffects        String
+  storage            String
+  sellingPoints      String
+  faqs               Json // Array of FAQ objects: [{question, answer}]
+  doctorFaqs         Json // FAQs specific to doctors: [{question, answer}]
+  visualAids         String[] // Array of URLs/paths
+  clinicalReferences String
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model CompetitorProduct {
+  id              String   @id @default(uuid())
+  productId       String
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name            String
+  manufacturer    String
+  composition     String
+  strength        String
+  price           Float
+  comparisonNotes String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Doctor {
+  id            String        @id @default(uuid())
+  userId        String        @unique
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialty     String
+  clinicName    String?
+  clinicAddress String?
+  phone         String?
+  visits        DoctorVisit[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model MedicalRepresentative {
+  id        String        @id @default(uuid())
+  userId    String        @unique
+  user      User          @relation("MRUser", fields: [userId], references: [id], onDelete: Cascade)
+  territory String
+  managerId String?
+  manager   User?         @relation("MRManager", fields: [managerId], references: [id])
+  visits    DoctorVisit[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+}
+
+model DoctorVisit {
+  id        String                @id @default(uuid())
+  mrId      String
+  mr        MedicalRepresentative @relation(fields: [mrId], references: [id], onDelete: Cascade)
+  doctorId  String
+  doctor    Doctor                @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  visitDate DateTime
+  purpose   String
+  status    String // e.g. "PENDING", "COMPLETED", "CANCELLED"
+  report    VisitReport?
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+}
+
+model VisitReport {
+  id                 String      @id @default(uuid())
+  visitId            String      @unique
+  visit              DoctorVisit @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  feedback           String
+  samplesGiven       Json? // JSON array of sample products and quantities: [{productName, quantity}]
+  detailedDiscussion String?
+  nextFollowUpDate   DateTime?
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+}
+
+model TrainingModule {
+  id            String         @id @default(uuid())
+  productId     String?
+  product       Product?       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  content       String // Markdown or HTML
+  estimatedTime Int // in minutes
+  questions     QuizQuestion[]
+  certificates  Certificate[]
+  quizResults   QuizResult[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([productId])
+}
+
+model QuizQuestion {
+  id           String         @id @default(uuid())
+  moduleId     String
+  module       TrainingModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  questionText String
+  productId    String?
+  product      Product?       @relation(fields: [productId], references: [id])
+  answers      QuizAnswer[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model QuizAnswer {
+  id         String       @id @default(uuid())
+  questionId String
+  question   QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answerText String
+  isCorrect  Boolean
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+}
+
+model QuizResult {
+  id        String         @id @default(uuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduleId  String
+  module    TrainingModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  score     Float // percentage e.g. 85.5
+  passed    Boolean
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+model Video {
+  id           String   @id @default(uuid())
+  title        String
+  description  String?
+  url          String
+  duration     Int // seconds
+  thumbnailUrl String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Blog {
+  id          String    @id @default(uuid())
+  title       String
+  slug        String    @unique
+  content     String
+  authorId    String
+  author      User      @relation(fields: [authorId], references: [id])
+  published   Boolean   @default(false)
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Enquiry {
+  id            String   @id @default(uuid())
+  enquiryNumber String   @unique
+  name          String
+  email         String
+  phone         String?
+  subject       String
+  message       String
+  productId     String?
+  product       Product? @relation(fields: [productId], references: [id])
+  status        String   @default("PENDING") // PENDING, RESOLVED, IN_PROGRESS
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model AIChat {
+  id           String   @id @default(uuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id])
+  sessionToken String
+  prompt       String
+  response     String
+  sourcesUsed  Json? // Array of strings or object metadata
+  createdAt    DateTime @default(now())
+}
+
+model Certificate {
+  id                String         @id @default(uuid())
+  userId            String
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moduleId          String
+  module            TrainingModule @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  certificateNumber String         @unique
+  issuedAt          DateTime       @default(now())
+}
+
+model Setting {
+  key         String   @id
+  value       String
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  details   String?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+}
+
+model Course {
+  id                String      @id @default(uuid())
+  productId         String      @unique
+  product           Product     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  title             String
+  description       String?
+  estimatedDuration Int         @default(0)
+  modules           LmsModule[]
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+}
+
+model LmsModule {
+  id          String      @id @default(uuid())
+  courseId    String
+  course      Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  order       Int
+  lessons     LmsLesson[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model LmsLesson {
+  id            String         @id @default(uuid())
+  moduleId      String
+  module        LmsModule      @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  title         String
+  description   String?
+  order         Int
+  estimatedTime Int            @default(0)
+  blocks        ContentBlock[]
+  references    LmsReference[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+}
+
+model ContentBlock {
+  id        String    @id @default(uuid())
+  lessonId  String
+  lesson    LmsLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  type      String
+  content   Json
+  order     Int
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model LmsReference {
+  id        String    @id @default(uuid())
+  lessonId  String
+  lesson    LmsLesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  journal   String?
+  doi       String?
+  url       String?
+  guideline String?
+  publisher String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}

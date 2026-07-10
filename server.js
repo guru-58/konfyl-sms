@@ -1,54 +1,13 @@
 import './src/config/env.js';
-import express from 'express';
+import app from './src/app.js';
 import logger from './src/utils/logger.js';
-import { corsMiddleware, helmetMiddleware } from './src/middleware/security.js';
-import enquiryRoutes from './src/routes/enquiryRoutes.js';
 
-const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Enquiries are processed in-memory and sent via email. No database storage is configured.
-
-// 2. Global Express Security & Utility Middlewares
-app.use(helmetMiddleware);
-app.use(corsMiddleware);
-app.use(express.json({ limit: '10kb' })); // Limits request body size for security
-app.use(express.urlencoded({ extended: true, limit: '10kb' }));
-
-// 3. Register API Routes
-app.use('/api', enquiryRoutes);
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
-});
-
-// 4. Handle 404 Route Not Found
-app.use((req, res, next) => {
-  logger.warn(`404 Route Not Found: ${req.method} ${req.originalUrl}`);
-  res.status(404).json({ error: 'Endpoint not found.' });
-});
-
-// 5. Global Error Handling Middleware
-app.use((err, req, res, next) => {
-  logger.error(`Unhandled Exception on ${req.method} ${req.originalUrl} from IP: ${req.ip}:`, err);
-  
-  // CORS library throws errors we can intercept
-  if (err.message === 'Not allowed by CORS') {
-    return res.status(403).json({ error: 'Blocked by CORS policy.' });
-  }
-
-  res.status(500).json({ 
-    error: 'An unexpected database or application error occurred.' 
-  });
-});
-
-// 6. Listen for Incoming Connections
 const server = app.listen(PORT, () => {
   logger.info(`Server successfully listening on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode.`);
 });
 
-// Handle graceful shutdown signals
 process.on('SIGTERM', () => {
   logger.info('SIGTERM signal received. Closing HTTP server...');
   server.close(() => {

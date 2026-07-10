@@ -4,60 +4,56 @@ import helmet from 'helmet';
 import xss from 'xss';
 import logger from '../utils/logger.js';
 
-// 1. Helmet Middleware Config
-export const helmetMiddleware = helmet();
+export const helmetMiddleware = helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+});
 
-// 2. CORS Middleware Config
-const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:5173';
-const allowedOrigins = Array.isArray(process.env.CORS_ORIGIN)
-  ? process.env.CORS_ORIGIN
-  : String(process.env.CORS_ORIGIN || 'http://localhost:5173')
-      .split(',')
-      .map(origin => origin.trim())
-      .filter(Boolean);
+const allowedOrigins = String(process.env.CORS_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
 
 export const corsMiddleware = cors({
   origin: (origin, callback) => {
-    const isLocalHost = origin && origin.startsWith('http://localhost:');
-    const isAllowed = !origin || allowedOrigins.includes(origin) || isLocalHost || process.env.NODE_ENV === 'development';
+    const isLocalhost = origin && origin.startsWith('http://localhost:');
+    const allowed = !origin || isLocalhost || allowedOrigins.includes(origin) || process.env.NODE_ENV === 'development';
 
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      logger.warn(`CORS blocked request from origin: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
+    if (allowed) {
+      return callback(null, true);
     }
+
+    logger.warn(`CORS blocked request from origin: ${origin}`);
+    callback(new Error('Not allowed by CORS'));
   },
-  methods: ['POST', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With', 'X-CSRF-Token'],
   credentials: true,
-  preflightContinue: false,
-  optionsSuccessStatus: 204
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With', 'X-CSRF-Token']
 });
 
-// 3. Rate Limiter for Enquiry endpoint (max 5 requests per 15 minutes per IP)
+export const requestLoggerMiddleware = (req, res, next) => {
+  logger.info(`${req.ip} ${req.method} ${req.originalUrl}`);
+  next();
+};
+
 export const enquiryRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5,
-  message: { 
-    error: 'Too many enquiry submissions from this IP. Please try again after 15 minutes.' 
-  },
-  standardHeaders: true, 
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  standardHeaders: true,
   legacyHeaders: false,
-  handler: (req, res, next, options) => {
+  handler: (req, res) => {
     logger.warn(`Rate limit exceeded for IP: ${req.ip}`);
-    res.status(429).json(options.message);
+    res.status(429).json({ error: 'Too many requests. Please try again later.' });
   }
 });
 
-// 4. NoSQL Injection Prevention Middleware
 export const nosqlInjectionPrevention = (req, res, next) => {
-  const sanitize = (obj) => {
+  const sanitize = obj => {
     if (obj && typeof obj === 'object') {
-      for (const key in obj) {
+      for (const key of Object.keys(obj)) {
         if (key.startsWith('$')) {
-          logger.warn(`NoSQL Injection Attempt Blocked. Key: ${key} deleted.`);
           delete obj[key];
+          logger.warn(`Blocked potential NoSQL injection key: ${key}`);
         } else if (typeof obj[key] === 'object') {
           sanitize(obj[key]);
         }
@@ -71,17 +67,27 @@ export const nosqlInjectionPrevention = (req, res, next) => {
   next();
 };
 
-// 5. Input Sanitization (XSS Prevention) Middleware
 export const xssSanitization = (req, res, next) => {
-  if (req.body) {
-    for (const key in req.body) {
-      if (typeof req.body[key] === 'string') {
-        // Trim whitespace first
-        req.body[key] = req.body[key].trim();
-        // Strip out HTML tags to prevent cross site scripting
-        req.body[key] = xss(req.body[key]);
+  if (req.body && typeof req.body === 'object') {
+    for (const [key, value] of Object.entries(req.body)) {
+      if (typeof value === 'string') {
+        req.body[key] = xss(value.trim());
       }
     }
   }
   next();
+};
+
+export const errorHandler = (err, req, res, next) => {
+  logger.error(`Unhandled error in ${req.method} ${req.originalUrl}`, err);
+
+  if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
+    return res.status(400).json({ error: 'Malformed JSON payload.' });
+  }
+
+  if (err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ error: 'Blocked by CORS policy.' });
+  }
+
+  res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
 };

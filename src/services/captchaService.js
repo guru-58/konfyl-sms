@@ -4,6 +4,10 @@ export const verifyTurnstileToken = async (token, ip = '') => {
   const secretKey = process.env.TURNSTILE_SECRET_KEY;
 
   if (!token) {
+    if (process.env.NODE_ENV === 'development') {
+      logger.warn('Spam Prevention: Captcha token is missing. Allowing bypass in development mode.');
+      return true;
+    }
     logger.warn('Spam Prevention: Captcha token is missing.');
     return false;
   }
