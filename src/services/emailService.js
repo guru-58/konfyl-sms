@@ -7,13 +7,13 @@ export const emailConfig = {
   tagline: 'Trusted Quality. Better Care.',
   logoUrl: process.env.EMAIL_LOGO_URL || 'https://konfyl.com/images/previews/page2.png',
   website: 'https://konfyl.com',
-  email: 'info@konfylpharma.com',
+  email: 'info@konfyl.com',
   phone: '+91 9307354558',
   corporateAddress: 'A-710, Jagannath Galaxy, Talpada, Badlapur E.D., Ambarnath, Thane - 421503, Maharashtra',
   registeredAddress: 'Shop No. 17 Malmatta No. VR17/667/437, Sumit Greendale Chikal Dongari Road Global City, Virar West, Dist- Palghar-401303',
   googleMapsLink: 'https://maps.google.com/?q=KONFYL+Pharmaceutical+Pvt+Ltd',
   socialLinks: {
-    instagram: 'https://instagram.com',
+    instagram: 'https://www.instagram.com/konfylpharmaceutical/',
     facebook: 'https://facebook.com',
     linkedin: 'https://linkedin.com',
     youtube: 'https://youtube.com'
