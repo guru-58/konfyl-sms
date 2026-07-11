@@ -3,6 +3,9 @@ import express from 'express';
 import logger from './src/utils/logger.js';
 import { corsMiddleware, helmetMiddleware } from './src/middleware/security.js';
 import enquiryRoutes from './src/routes/enquiryRoutes.js';
+import authRoutes from './src/routes/authRoutes.js';
+import examRoutes from './src/routes/examRoutes.js';
+import resultRoutes from './src/routes/resultRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -15,8 +18,19 @@ app.use(corsMiddleware);
 app.use(express.json({ limit: '10kb' })); // Limits request body size for security
 app.use(express.urlencoded({ extended: true, limit: '10kb' }));
 
+// Force browser to not cache dynamic API responses
+app.use((req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  next();
+});
+
 // 3. Register API Routes
 app.use('/api', enquiryRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/exams', examRoutes);
+app.use('/api/results', resultRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
