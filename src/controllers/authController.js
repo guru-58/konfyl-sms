@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { collection, query, where, getDocs, addDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../config/firebase.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'konfyl-jwt-default-secret-key-98765';
@@ -38,6 +38,7 @@ export const signup = async (req, res) => {
       email: email.toLowerCase(),
       password: hashedPassword,
       role,
+      changeForcePassword: true,
       createdAt: new Date().toISOString()
     });
 
@@ -45,7 +46,8 @@ export const signup = async (req, res) => {
       id: userDocRef.id,
       name,
       email: email.toLowerCase(),
-      role
+      role,
+      changeForcePassword: true
     };
 
     // Generate JWT
@@ -83,11 +85,15 @@ export const login = async (req, res) => {
       return res.status(401).json({ error: 'Invalid email or password.' });
     }
 
+    const isDefaultPassword = password === 'password@123' || password === 'password123';
+    const forceChange = userData.changeForcePassword === true || isDefaultPassword;
+
     const userProfile = {
       id: userDoc.id,
       name: userData.name,
       email: userData.email,
-      role: userData.role
+      role: userData.role,
+      changeForcePassword: forceChange
     };
 
     // Generate JWT
@@ -100,9 +106,129 @@ export const login = async (req, res) => {
   }
 };
 
+export const changePassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+
+  if (!req.user) {
+    return res.status(401).json({ error: 'Not authenticated.' });
+  }
+
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: 'Current password and new password are required.' });
+  }
+
+  if (newPassword.length < 6) {
+    return res.status(400).json({ error: 'New password must be at least 6 characters.' });
+  }
+
+  try {
+    const userId = req.user.id;
+    const userDocRef = doc(db, 'users', userId);
+    
+    // We fetch user doc using getDoc to verify current password
+    const userDocSnap = await getDoc(userDocRef);
+    if (!userDocSnap.exists()) {
+      return res.status(404).json({ error: 'User not found.' });
+    }
+
+    const userData = userDocSnap.data();
+
+    // Check old password
+    const isMatch = await bcrypt.compare(currentPassword, userData.password);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Current password is incorrect.' });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Save to Firestore
+    await setDoc(userDocRef, {
+      password: hashedPassword,
+      changeForcePassword: false
+    }, { merge: true });
+
+    const userProfile = {
+      id: userId,
+      name: userData.name,
+      email: userData.email,
+      role: userData.role,
+      changeForcePassword: false
+    };
+
+    // Generate updated JWT token
+    const token = jwt.sign(userProfile, JWT_SECRET, { expiresIn: '7d' });
+
+    res.status(200).json({ token, user: userProfile });
+  } catch (err) {
+    console.error('Change password error:', err);
+    res.status(500).json({ error: 'Error during password update.' });
+  }
+};
+
 export const getMe = async (req, res) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Not authenticated.' });
   }
   res.status(200).json({ user: req.user });
+};
+
+export const deleteUser = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const userDocRef = doc(db, 'users', id);
+    await deleteDoc(userDocRef);
+    res.status(200).json({ message: 'User deleted successfully.' });
+  } catch (err) {
+    console.error('Delete user error:', err);
+    res.status(500).json({ error: 'Failed to delete user.' });
+  }
+};
+
+export const updateUser = async (req, res) => {
+  const { id } = req.params;
+  const { name, email, role } = req.body;
+
+  if (!name || !email || !role) {
+    return res.status(400).json({ error: 'Name, email, and role are required.' });
+  }
+
+  const validRoles = ['mr', 'rsm', 'zsm', 'admin'];
+  if (!validRoles.includes(role)) {
+    return res.status(400).json({ error: 'Invalid role.' });
+  }
+
+  try {
+    const userDocRef = doc(db, 'users', id);
+    await setDoc(userDocRef, {
+      name,
+      email: email.toLowerCase(),
+      role
+    }, { merge: true });
+
+    res.status(200).json({ id, name, email, role });
+  } catch (err) {
+    console.error('Update user error:', err);
+    res.status(500).json({ error: 'Failed to update user.' });
+  }
+};
+
+export const resetUserPassword = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const userDocRef = doc(db, 'users', id);
+    const hashedPassword = await bcrypt.hash('Welcome@123', 10);
+
+    await setDoc(userDocRef, {
+      password: hashedPassword,
+      changeForcePassword: true
+    }, { merge: true });
+
+    res.status(200).json({ message: 'Password reset to Welcome@123 successfully.' });
+  } catch (err) {
+    console.error('Reset password error:', err);
+    res.status(500).json({ error: 'Failed to reset user password.' });
+  }
 };

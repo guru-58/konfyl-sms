@@ -1,4 +1,4 @@
-import { collection, query, where, getDocs, addDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, addDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../config/firebase.js';
 
 export const saveResult = async (req, res) => {
@@ -9,6 +9,17 @@ export const saveResult = async (req, res) => {
   }
 
   try {
+    // Check if result already exists for this MR & Exam to prevent duplicates
+    const checkQuery = query(
+      collection(db, 'results'),
+      where('mrEmail', '==', req.user.email),
+      where('examId', '==', examId)
+    );
+    const checkSnapshot = await getDocs(checkQuery);
+    if (!checkSnapshot.empty) {
+      return res.status(400).json({ error: 'You have already submitted answers for this exam.' });
+    }
+
     const resultDoc = {
       mrId: req.user.id,
       mrName: req.user.name,
@@ -90,5 +101,17 @@ export const getAllMRs = async (req, res) => {
   } catch (err) {
     console.error('Error fetching MR list:', err);
     res.status(500).json({ error: 'Failed to retrieve Medical Representatives directory.' });
+  }
+};
+
+export const deleteResult = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const resultDocRef = doc(db, 'results', id);
+    await deleteDoc(resultDocRef);
+    res.status(200).json({ message: 'Result attempt deleted successfully.' });
+  } catch (err) {
+    console.error('Delete result error:', err);
+    res.status(500).json({ error: 'Failed to delete result scorecard.' });
   }
 };
