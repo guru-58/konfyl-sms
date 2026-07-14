@@ -10,7 +10,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@rolldown/binding-darwin-arm64": "^1.1.5",
     "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
