@@ -14,3 +14,8 @@ const finalPath = fs.existsSync(path2) ? path2 : path3;
 
 // Load environment variables
 dotenv.config({ path: finalPath });
+
+if (process.env.NODE_ENV === 'test' && !process.env.APP_TIMEZONE) {
+  process.env.APP_TIMEZONE = 'Asia/Kolkata';
+}
+

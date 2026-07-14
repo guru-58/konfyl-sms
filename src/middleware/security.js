@@ -50,6 +50,21 @@ export const enquiryRateLimiter = rateLimit({
   }
 });
 
+// Rate Limiter for Login endpoint (max 10 attempts per 15 minutes per IP)
+export const loginRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10,
+  message: { 
+    error: 'Too many login attempts from this IP. Please try again after 15 minutes.' 
+  },
+  standardHeaders: true, 
+  legacyHeaders: false,
+  handler: (req, res, next, options) => {
+    logger.warn(`Login rate limit exceeded for IP: ${req.ip}`);
+    res.status(429).json(options.message);
+  }
+});
+
 // 4. NoSQL Injection Prevention Middleware
 export const nosqlInjectionPrevention = (req, res, next) => {
   const sanitize = (obj) => {

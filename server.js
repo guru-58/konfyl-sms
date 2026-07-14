@@ -1,4 +1,8 @@
 import './src/config/env.js';
+import { validateEnv } from './src/validators/envValidator.js';
+// Run environment validation on startup
+validateEnv();
+
 import express from 'express';
 import logger from './src/utils/logger.js';
 import { corsMiddleware, helmetMiddleware } from './src/middleware/security.js';
@@ -6,6 +10,15 @@ import enquiryRoutes from './src/routes/enquiryRoutes.js';
 import authRoutes from './src/routes/authRoutes.js';
 import examRoutes from './src/routes/examRoutes.js';
 import resultRoutes from './src/routes/resultRoutes.js';
+import publicProductRoutes from './src/routes/publicProductRoutes.js';
+import adminProductRoutes from './src/routes/adminProductRoutes.js';
+import crmOrganizationRoutes from './src/routes/crmOrganizationRoutes.js';
+import crmAssignmentRoutes from './src/routes/crmAssignmentRoutes.js';
+import crmDoctorRoutes from './src/routes/crmDoctorRoutes.js';
+import crmInstitutionRoutes from './src/routes/crmInstitutionRoutes.js';
+import crmSpecialtyRoutes from './src/routes/crmSpecialtyRoutes.js';
+import crmScopedRoutes from './src/routes/crmScopedRoutes.js';
+import crmTourPlanRoutes from './src/routes/crmTourPlanRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -31,6 +44,16 @@ app.use('/api', enquiryRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/exams', examRoutes);
 app.use('/api/results', resultRoutes);
+app.use('/api/public', publicProductRoutes);
+app.use('/api/admin/crm', crmOrganizationRoutes);
+app.use('/api/admin/crm', crmAssignmentRoutes);
+app.use('/api/admin/crm', crmDoctorRoutes);
+app.use('/api/admin/crm', crmInstitutionRoutes);
+app.use('/api/admin/crm', crmSpecialtyRoutes);
+app.use('/api/admin', adminProductRoutes);
+app.use('/api/crm', crmScopedRoutes);
+app.use('/api/crm', crmTourPlanRoutes);
+app.use('/api', crmTourPlanRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -58,23 +81,28 @@ app.use((err, req, res, next) => {
 });
 
 // 6. Listen for Incoming Connections
-const server = app.listen(PORT, () => {
-  logger.info(`Server successfully listening on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode.`);
-});
-
-// Handle graceful shutdown signals
-process.on('SIGTERM', () => {
-  logger.info('SIGTERM signal received. Closing HTTP server...');
-  server.close(() => {
-    logger.info('HTTP server closed.');
-    process.exit(0);
+let server;
+if (process.env.NODE_ENV !== 'test') {
+  server = app.listen(PORT, () => {
+    logger.info(`Server successfully listening on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode.`);
   });
-});
 
-process.on('SIGINT', () => {
-  logger.info('SIGINT signal received. Closing HTTP server...');
-  server.close(() => {
-    logger.info('HTTP server closed.');
-    process.exit(0);
+  // Handle graceful shutdown signals
+  process.on('SIGTERM', () => {
+    logger.info('SIGTERM signal received. Closing HTTP server...');
+    server.close(() => {
+      logger.info('HTTP server closed.');
+      process.exit(0);
+    });
   });
-});
+
+  process.on('SIGINT', () => {
+    logger.info('SIGINT signal received. Closing HTTP server...');
+    server.close(() => {
+      logger.info('HTTP server closed.');
+      process.exit(0);
+    });
+  });
+}
+
+export default app;
