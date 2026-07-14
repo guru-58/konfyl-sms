@@ -34,6 +34,18 @@ export function validateEnv() {
     }
   }
 
+  // Validate APP_TIMEZONE
+  const appTimezone = process.env.APP_TIMEZONE;
+  if (!appTimezone) {
+    errors.push('APP_TIMEZONE environment variable is missing.');
+  } else {
+    try {
+      Intl.DateTimeFormat(undefined, { timeZone: appTimezone });
+    } catch (err) {
+      errors.push(`APP_TIMEZONE is set to an invalid timezone: "${appTimezone}".`);
+    }
+  }
+
   if (errors.length > 0) {
     logger.error('CRITICAL: Startup environment validation failed with the following errors:');
     errors.forEach((err) => logger.error(`  - ${err}`));

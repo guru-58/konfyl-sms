@@ -12,6 +12,13 @@ import examRoutes from './src/routes/examRoutes.js';
 import resultRoutes from './src/routes/resultRoutes.js';
 import publicProductRoutes from './src/routes/publicProductRoutes.js';
 import adminProductRoutes from './src/routes/adminProductRoutes.js';
+import crmOrganizationRoutes from './src/routes/crmOrganizationRoutes.js';
+import crmAssignmentRoutes from './src/routes/crmAssignmentRoutes.js';
+import crmDoctorRoutes from './src/routes/crmDoctorRoutes.js';
+import crmInstitutionRoutes from './src/routes/crmInstitutionRoutes.js';
+import crmSpecialtyRoutes from './src/routes/crmSpecialtyRoutes.js';
+import crmScopedRoutes from './src/routes/crmScopedRoutes.js';
+import crmTourPlanRoutes from './src/routes/crmTourPlanRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -38,7 +45,15 @@ app.use('/api/auth', authRoutes);
 app.use('/api/exams', examRoutes);
 app.use('/api/results', resultRoutes);
 app.use('/api/public', publicProductRoutes);
+app.use('/api/admin/crm', crmOrganizationRoutes);
+app.use('/api/admin/crm', crmAssignmentRoutes);
+app.use('/api/admin/crm', crmDoctorRoutes);
+app.use('/api/admin/crm', crmInstitutionRoutes);
+app.use('/api/admin/crm', crmSpecialtyRoutes);
 app.use('/api/admin', adminProductRoutes);
+app.use('/api/crm', crmScopedRoutes);
+app.use('/api/crm', crmTourPlanRoutes);
+app.use('/api', crmTourPlanRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

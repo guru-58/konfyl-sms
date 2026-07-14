@@ -6,7 +6,11 @@ import { db } from '../config/firebase.js';
 const JWT_SECRET = process.env.JWT_SECRET || 'konfyl-jwt-default-secret-key-98765';
 
 export const signup = async (req, res) => {
-  const { name, email, password, role } = req.body;
+  const { 
+    name, email, password, role, 
+    employeeCode, firstName, lastName, mobile, 
+    joiningDate, employmentStatus, currentHeadquartersId 
+  } = req.body;
 
   if (!name || !email || !password || !role) {
     return res.status(400).json({ error: 'All fields (name, email, password, role) are required.' });
@@ -29,25 +33,45 @@ export const signup = async (req, res) => {
       return res.status(400).json({ error: 'Email already registered.' });
     }
 
+    // Verify employeeCode is unique if provided
+    if (employeeCode) {
+      const qCode = query(collection(db, 'users'), where('employeeCode', '==', employeeCode.toUpperCase().trim()));
+      const codeSnapshot = await getDocs(qCode);
+      if (!codeSnapshot.empty) {
+        return res.status(400).json({ error: 'Employee code already exists.' });
+      }
+    }
+
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create user document in Firestore
-    const userDocRef = await addDoc(collection(db, 'users'), {
+    const userPayload = {
       name,
       email: email.toLowerCase(),
       password: hashedPassword,
       role,
       changeForcePassword: true,
-      createdAt: new Date().toISOString()
-    });
+      createdAt: new Date().toISOString(),
+      employeeCode: employeeCode ? employeeCode.toUpperCase().trim() : null,
+      firstName: firstName || null,
+      lastName: lastName || null,
+      mobile: mobile || null,
+      joiningDate: joiningDate || null,
+      employmentStatus: employmentStatus || 'ACTIVE',
+      currentHeadquartersId: currentHeadquartersId || null
+    };
+
+    // Create user document in Firestore
+    const userDocRef = await addDoc(collection(db, 'users'), userPayload);
 
     const userProfile = {
       id: userDocRef.id,
       name,
       email: email.toLowerCase(),
       role,
-      changeForcePassword: true
+      changeForcePassword: true,
+      employeeCode: userPayload.employeeCode,
+      employmentStatus: userPayload.employmentStatus
     };
 
     // Generate JWT
@@ -188,7 +212,11 @@ export const deleteUser = async (req, res) => {
 
 export const updateUser = async (req, res) => {
   const { id } = req.params;
-  const { name, email, role } = req.body;
+  const { 
+    name, email, role, 
+    employeeCode, firstName, lastName, mobile, 
+    employmentStatus, joiningDate, currentHeadquartersId 
+  } = req.body;
 
   if (!name || !email || !role) {
     return res.status(400).json({ error: 'Name, email, and role are required.' });
@@ -200,14 +228,33 @@ export const updateUser = async (req, res) => {
   }
 
   try {
+    // Verify employeeCode unique if changed
+    if (employeeCode) {
+      const qCode = query(collection(db, 'users'), where('employeeCode', '==', employeeCode.toUpperCase().trim()));
+      const codeSnapshot = await getDocs(qCode);
+      const conflicts = codeSnapshot.docs.filter(doc => doc.id !== id);
+      if (conflicts.length > 0) {
+        return res.status(400).json({ error: 'Employee code is already assigned to another user.' });
+      }
+    }
+
     const userDocRef = doc(db, 'users', id);
-    await setDoc(userDocRef, {
+    const updatePayload = {
       name,
       email: email.toLowerCase(),
-      role
-    }, { merge: true });
+      role,
+      employeeCode: employeeCode ? employeeCode.toUpperCase().trim() : null,
+      firstName: firstName || null,
+      lastName: lastName || null,
+      mobile: mobile || null,
+      employmentStatus: employmentStatus || 'ACTIVE',
+      joiningDate: joiningDate || null,
+      currentHeadquartersId: currentHeadquartersId || null
+    };
 
-    res.status(200).json({ id, name, email, role });
+    await setDoc(userDocRef, updatePayload, { merge: true });
+
+    res.status(200).json({ id, ...updatePayload });
   } catch (err) {
     console.error('Update user error:', err);
     res.status(500).json({ error: 'Failed to update user.' });

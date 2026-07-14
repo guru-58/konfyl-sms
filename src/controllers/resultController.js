@@ -80,23 +80,30 @@ export const getAllResults = async (req, res) => {
 
 export const getAllMRs = async (req, res) => {
   try {
-    const q = query(
-      collection(db, 'users'),
-      where('role', 'in', ['mr', 'rsm', 'zsm'])
-    );
-    const querySnapshot = await getDocs(q);
+    // Use Admin SDK so document IDs are consistent with what crmAssignmentService looks up
+    const { db: adminDb } = await import('../config/firebaseAdmin.js');
+    const snapshot = await adminDb.collection('users')
+      .where('role', 'in', ['mr', 'rsm', 'zsm'])
+      .get();
     const list = [];
-    querySnapshot.forEach(doc => {
+    snapshot.forEach(doc => {
       const data = doc.data();
       list.push({
         uid: doc.id,
         name: data.name,
         email: data.email,
         role: data.role,
+        employeeCode: data.employeeCode || null,
         createdAt: data.createdAt
       });
     });
-
+    list.sort((a, b) => {
+      const roleOrder = { zsm: 1, rsm: 2, mr: 3 };
+      const ra = roleOrder[a.role] || 9;
+      const rb = roleOrder[b.role] || 9;
+      if (ra !== rb) return ra - rb;
+      return (a.name || '').localeCompare(b.name || '');
+    });
     res.status(200).json(list);
   } catch (err) {
     console.error('Error fetching MR list:', err);
